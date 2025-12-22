@@ -12,18 +12,29 @@
 void hookClientState(CallbackListPtr *pcbl, void *unused, void *calldata)
 {
     XNS_HOOK_HEAD(NewClientInfoRec);
+    // just get actual name instead of path or command flags
+    const char *clientName = strtok(strdup(basename(GetClientCmdName(client))), " ");
 
     switch (client->clientState) {
     case ClientStateInitial:
-        // nothing can happen in this state
+        // nothing can happen in this state. auth cookie can't be loaded from env yet
+        // BUT the client name can be grabbed and the client list can be walked
+        if (XnamespaceAssignByClientName(subj,clientName)==0) {
+            return;
+        } // not in client lists
+
         break;
 
     case ClientStateRunning:
-
-        subj->authId = AuthorizationIDOfClient(client);
-
-        // just get actual name instead of path or command flags
-        const char *clientName = strtok(basename(GetClientCmdName(client)), " ");
+        const XID envauth = AuthorizationIDOfClient(client);
+        // only change if uninitialized from client name walk (0)
+        if (subj->ns != NULL && subj->authId!=0) {
+            // optionally override assignment by env
+            if (envauth==0)
+                return;
+            XNS_LOG("Overriding auth from env for %s\n",clientName);
+        }
+        subj->authId = envauth;
 
         // check env (XAUTHORITY) first
         short unsigned int name_len = 0, data_len = 0;
@@ -31,18 +42,13 @@ void hookClientState(CallbackListPtr *pcbl, void *unused, void *calldata)
         char * data = NULL;
         if (AuthorizationFromID(subj->authId, &name_len, &name, &data_len, &data)) {
             XnamespaceAssignClient(subj, XnsFindByAuth(name_len, name, data_len, data));
-            return;
-        }
-        else if (XnamespaceAssignByClientName(subj,client)==0) {
-            return;
-            // not in client lists
         } // midpoint - we're not in the client lists nor do we have auth from env
         else if (ns_default->deny) {
             XNS_LOG("Deny Connection Request From %s\n",clientName);
             client->noClientException = -1;
-            return;
         }
         else if (!ns_default->builtin) {
+            // builtin flag should only be unset if the config is set as new_ns
             // "fancy" formatted name
             int len = snprintf(NULL, 0, "%s%d", clientName, client->index);
             char *str = malloc(len + 1);
@@ -50,11 +56,15 @@ void hookClientState(CallbackListPtr *pcbl, void *unused, void *calldata)
 
             struct Xnamespace *new_run_ns = GenerateNewXnamespaceForClient(&ns_anon, str);
             if (new_run_ns!=NULL) {
+                subj->authId = GenerateAuthForXnamespace(new_run_ns);
                 XnamespaceAssignClient(subj, new_run_ns);}
             else {
                 XNS_LOG("Failed to assign new namespace, assigning to anon\n");
                 XnamespaceAssignClient(subj,&ns_anon);
             }
+        }
+        // authId should ONLY be 0 at this point if it's truly unauthorized
+        if (subj->authId!=0) {
             return;
         }
         XNS_HOOK_LOG("No Auth, Assigning to default %s\n",ns_default->name);

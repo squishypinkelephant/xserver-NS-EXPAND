@@ -37,6 +37,8 @@ struct Xnamespace *ns_default;
 
 struct xorg_list ns_list = { 0 };
 
+struct xorg_list client_list = { 0 };
+
 char *namespaceConfigFile = NULL;
 char *default_namespace;
 
@@ -201,12 +203,11 @@ static void parseLine(char *line, struct Xnamespace **walk_ns)
         while ((token = strtok(NULL, " ")) != NULL) {
             struct client_token *new_token = calloc(1, sizeof(struct client_token));
             new_token->clientName = strdup(token);
-            xorg_list_append_ndup(&new_token->entry, &curr->client_list);
+            new_token->Designation = curr;
+            xorg_list_append_ndup(&new_token->entry, &client_list);
             XNS_LOG("client %s added for %s\n",new_token->clientName,curr->name);
         }
     }
-
-
     XNS_LOG("unknown token \"%s\"\n", token);
 }
 

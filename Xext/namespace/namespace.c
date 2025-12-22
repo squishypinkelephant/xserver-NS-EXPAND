@@ -105,7 +105,7 @@ XID GenerateAuthForXnamespace(struct Xnamespace *curr) {
     struct auth_token *gen_token = calloc(1, sizeof(struct auth_token));
     if (gen_token == NULL)
         FatalError("Xnamespace: failed allocating token\n");
-    gen_token->authProto = strdup("MIT-MAGIC-COOKIE-1");
+    gen_token->authProto = strdup(XAUTH_PROTO_MIT);
     gen_token->authTokenLen = 16;
     gen_token->authTokenData = calloc(1, gen_token->authTokenLen);
 
@@ -144,21 +144,26 @@ int RevokeAuthForXnamespace(struct Xnamespace *curr) {
     return 0;
 }
 
-int XnamespaceAssignByClientName(struct XnamespaceClientPriv *subj, ClientPtr client) {
-    struct Xnamespace *walk;
+int XnamespaceAssignByClientName(struct XnamespaceClientPriv *subj, const char *clientName) {
     struct client_token *c_walk;
-    const char *clientName = basename(GetClientCmdName(client));
-    // no auth from env, walk the client list
-    xorg_list_for_each_entry(walk, &ns_list, entry) {
-        xorg_list_for_each_entry(c_walk, &walk->client_list, entry) {
-            // test for the name if it doesn't exist yet
-            if (strcmp(clientName, c_walk->clientName) == 0) {
-                XNS_LOG("%s matching ns found: %s\n",clientName,walk->name);
-                XnamespaceAssignClient(subj, walk);
+    struct auth_token *auth_token_walk;
+
+    xorg_list_for_each_entry(c_walk, &client_list, entry) {
+        // test for the name if it doesn't exist yet
+        if (strcmp(clientName, c_walk->clientName) == 0) {
+            XNS_LOG("%s matching ns found: %s\n",clientName,c_walk->Designation->name);
+            XnamespaceAssignClient(subj, c_walk->Designation);
+            // assign with first found token
+            xorg_list_for_each_entry(auth_token_walk, &c_walk->Designation->auth_tokens, entry) {
+                subj->authId = auth_token_walk->authId;
+                // (at least one) auth found for namespace, pass it on to the priv
                 return Success;
             }
+            XNS_LOG("No auth tokens for namespace, client still assigned\n");
+            return Success;
         }
     }
+    // failed to find a match
     return 1;
 }
 
@@ -178,7 +183,6 @@ struct Xnamespace *GenerateNewXnamespaceForClient(struct Xnamespace *copyfrom, c
     new_run_ns->name = newname;
 
     NewVirtualRootWindowForXnamespace(ns_root.rootWindow, new_run_ns);
-    GenerateAuthForXnamespace(new_run_ns);
 
     xorg_list_append_ndup(&new_run_ns->entry, &ns_list);
     return new_run_ns;
