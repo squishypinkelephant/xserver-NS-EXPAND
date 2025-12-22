@@ -22,8 +22,9 @@ void hookClientState(CallbackListPtr *pcbl, void *unused, void *calldata)
 
         subj->authId = AuthorizationIDOfClient(client);
 
-        // just get actual name instead of path
-        const char *clientName = basename(GetClientCmdName(client));
+        // just get actual name instead of path or command flags
+        const char *clientName = strtok(basename(GetClientCmdName(client)), " ");
+
         // check env (XAUTHORITY) first
         short unsigned int name_len = 0, data_len = 0;
         const char * name = NULL;
