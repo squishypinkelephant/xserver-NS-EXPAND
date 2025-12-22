@@ -26,7 +26,7 @@ void hookClientState(CallbackListPtr *pcbl, void *unused, void *calldata)
         break;
 
     case ClientStateRunning:
-        const XID envauth = AuthorizationIDOfClient(client);
+        XID envauth = AuthorizationIDOfClient(client);
         // only change if uninitialized from client name walk (0)
         if (subj->ns != NULL && subj->authId!=0) {
             // optionally override assignment by env
@@ -90,7 +90,7 @@ void hookClientDestroy(CallbackListPtr *pcbl, void *unused, void *calldata)
 
     if (!subj)
         return; /* no XNS devprivate assigned ? */
-    if(!subj->ns->builtin) {
+    if(subj->ns->builtin==0) {
         if (subj->ns->refcnt==1) {
             // this was the last client in the (new by default) namespace
             subj->ns->refcnt--;
