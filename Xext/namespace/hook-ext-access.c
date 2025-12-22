@@ -64,10 +64,6 @@ void hookExtAccess(CallbackListPtr *pcbl, void *unused, void *calldata)
             if (subj->ns->perms.allowScreen)
                 goto pass;
             goto reject;
-        case EXTENSION_MAJOR_SHM:
-            if (subj->ns->allowScreen)
-                goto pass;
-            goto reject;
     }
 
     XNS_HOOK_LOG("unhandled extension query: %s (%d)\n", param->ext->name, param->ext->index);
