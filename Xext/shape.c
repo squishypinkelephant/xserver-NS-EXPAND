@@ -31,10 +31,13 @@ in this Software without prior written authorization from The Open Group.
 #include <X11/Xproto.h>
 #include <X11/extensions/shapeproto.h>
 
+#include "dix/client_priv.h"
 #include "dix/dix_priv.h"
 #include "dix/gc_priv.h"
 #include "dix/request_priv.h"
 #include "dix/rpcbuf_priv.h"
+#include "dix/screenint_priv.h"
+#include "dix/screen_hooks_priv.h"
 #include "dix/window_priv.h"
 #include "miext/extinit_priv.h"
 #include "Xext/panoramiX.h"
@@ -51,9 +54,6 @@ in this Software without prior written authorization from The Open Group.
 #include "regionstr.h"
 #include "gcstruct.h"
 #include "protocol-versions.h"
-#include <screenint_priv.h>
-#include <screen_hooks_priv.h>
-#include <client_priv.h>
 
 Bool noShapeExtension = FALSE;
 
@@ -753,7 +753,7 @@ ProcShapeSelectInput(ClientPtr client)
              pShapeEvent; pShapeEvent = pShapeEvent->next) {
             if (pShapeEvent->client == client) {
                 return Success;}
-             }
+        }
 
         // Form the event
         pNewShapeEvent = calloc(1, sizeof(ShapeEventRec));
