@@ -53,6 +53,7 @@ in this Software without prior written authorization from The Open Group.
 #include "protocol-versions.h"
 #include <screenint_priv.h>
 #include <screen_hooks_priv.h>
+#include <client_priv.h>
 
 Bool noShapeExtension = FALSE;
 
@@ -89,6 +90,25 @@ typedef struct _ShapeEvent {
 
 #define  SHAPE_WINDOW_PRIVADDR(pWin) ((ShapeEventPtr *) \
 dixLookupPrivateAddr(&(pWin)->devPrivates, &ShapeWindowPrivateKeyRec))
+
+static Bool
+ShapeDelClientFromWin(WindowPtr pWin, void *value) {
+    ClientPtr client = value;
+    ShapeEventPtr *pHead = SHAPE_WINDOW_PRIVADDR(pWin);
+    ShapeEventPtr *prev = pHead;
+    ShapeEventPtr curr = *pHead;
+
+    while (curr) {
+        if (curr->client == client) {
+            *prev = curr->next;
+            free(curr);
+            break;
+        }
+        prev = &curr->next;
+        curr = curr->next;
+    }
+    return WT_WALKCHILDREN;
+}
 
 /****************
  * ShapeExtensionInit
@@ -727,15 +747,15 @@ ProcShapeSelectInput(ClientPtr client)
     ShapeEventPtr pShapeEvent, *pHead = SHAPE_WINDOW_PRIVADDR(pWin);
     switch (stuff->enable) {
     case xTrue:
-        if (pHead) {
-            /* check for existing entry. */
-            for (pShapeEvent = *pHead;
-                 pShapeEvent; pShapeEvent = pShapeEvent->next) {
-                if (pShapeEvent->client == client) {
-                    return Success;}
-                 }
-        }
-        // Form the event and add to devPrivates
+
+        /* check for existing entry. */
+        for (pShapeEvent = *pHead;
+             pShapeEvent; pShapeEvent = pShapeEvent->next) {
+            if (pShapeEvent->client == client) {
+                return Success;}
+             }
+
+        // Form the event
         pNewShapeEvent = calloc(1, sizeof(ShapeEventRec));
         if (!pNewShapeEvent)
             return BadAlloc;
@@ -743,24 +763,10 @@ ProcShapeSelectInput(ClientPtr client)
         pNewShapeEvent->client = client;
         pNewShapeEvent->window = pWin;
         dixSetPrivate(&pWin->devPrivates, &ShapeWindowPrivateKeyRec, pNewShapeEvent);
-        return Success;
         break;
     case xFalse:
         // remove the events with (client)
-        if (!pHead || !*pHead) {
-            ShapeEventPtr *prev = pHead;
-            ShapeEventPtr curr = *pHead;
-
-            while (curr) {
-                if (curr->client == client) {
-                    *prev = curr->next;
-                    free(curr);
-                    break;
-                }
-                prev = &curr->next;
-                curr = curr->next;
-            }
-        }
+        ShapeDelClientFromWin(pWin,client);
         break;
     default:
         client->errorValue = stuff->enable;
@@ -1013,16 +1019,22 @@ ShapeWindowDestroy(CallbackListPtr *pcbl, ScreenPtr pScreen, WindowPtr pWin)
     ShapeEventPtr pShapeEvent, next;
     ShapeEventPtr *pHead = SHAPE_WINDOW_PRIVADDR(pWin);
 
-    if (!pHead || !*pHead)
-        return;
-
     pShapeEvent = *pHead;
     while (pShapeEvent) {
         next = pShapeEvent->next;
         free(pShapeEvent);
         pShapeEvent = next;
     }
+    dixSetPrivate(&pWin->devPrivates, &ShapeWindowPrivateKeyRec, NULL);
+}
 
+static void
+ShapeClientDestroyCallback(CallbackListPtr *pcbl, void *unused, void *calldata)
+{
+    ClientPtr client = calldata;
+    DIX_FOR_EACH_SCREEN({
+        WalkTree(walkScreen, ShapeDelClientFromWin, client);
+    })
 }
 
 void
@@ -1036,6 +1048,8 @@ ShapeExtensionInit(void)
      DIX_FOR_EACH_SCREEN({
          dixScreenHookWindowDestroy(walkScreen,ShapeWindowDestroy);
     })
+
+     AddCallback(&ClientDestroyCallback, ShapeClientDestroyCallback, NULL);
 
     if ((extEntry = AddExtension(SHAPENAME, ShapeNumberEvents, 0,
                                  ProcShapeDispatch, ProcShapeDispatch,
