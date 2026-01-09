@@ -60,7 +60,7 @@ Bool noShapeExtension = FALSE;
 typedef RegionPtr (*CreateDftPtr) (WindowPtr    /* pWin */
     );
 
-DevPrivateKeyRec ShapeWindowPrivateKeyRec;
+static DevPrivateKeyRec ShapeWindowPrivateKeyRec;
 
 static void SShapeNotifyEvent(xShapeNotifyEvent * /* from */ ,
                               xShapeNotifyEvent *       /* to */
@@ -755,7 +755,7 @@ ProcShapeSelectInput(ClientPtr client)
                 return Success;}
         }
 
-        // Form the event
+        /* Form the event */
         pNewShapeEvent = calloc(1, sizeof(ShapeEventRec));
         if (!pNewShapeEvent)
             return BadAlloc;
@@ -765,7 +765,7 @@ ProcShapeSelectInput(ClientPtr client)
         dixSetPrivate(&pWin->devPrivates, &ShapeWindowPrivateKeyRec, pNewShapeEvent);
         break;
     case xFalse:
-        // remove the events with (client)
+        /* remove the events with (client) */
         ShapeDelClientFromWin(pWin,client);
         break;
     default:
@@ -1015,7 +1015,7 @@ SShapeNotifyEvent(xShapeNotifyEvent * from, xShapeNotifyEvent * to)
 static void
 ShapeWindowDestroy(CallbackListPtr *pcbl, ScreenPtr pScreen, WindowPtr pWin)
 {
-    // free the events before the window's devPrivates are free'd by destruction
+    /* free the events before the window's devPrivates are free'd by destruction */
     ShapeEventPtr pShapeEvent, next;
     ShapeEventPtr *pHead = SHAPE_WINDOW_PRIVADDR(pWin);
 
