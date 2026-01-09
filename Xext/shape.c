@@ -752,7 +752,8 @@ ProcShapeSelectInput(ClientPtr client)
         for (pShapeEvent = *pHead;
              pShapeEvent; pShapeEvent = pShapeEvent->next) {
             if (pShapeEvent->client == client) {
-                return Success;}
+                return Success;
+            }
         }
 
         /* Form the event */
